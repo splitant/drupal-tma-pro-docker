@@ -20,9 +20,8 @@ For Drupal 7.X versions.
    cd ../<project>-docker
    make copy-env-file
    # Fill env file
-   # optionally fill GITLAB_TOKEN in .env and `make gitlab-auth`
    make up
-   make setup
+   make drupal-install
    ```
 
 ### New project
@@ -33,7 +32,6 @@ For Drupal 7.X versions.
    cd ../<project>-docker
    make copy-env-file
    # Fill env file
-   make up
    make init
    ```
 

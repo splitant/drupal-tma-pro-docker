@@ -1,9 +1,9 @@
 version: "3.7"
 
 services:
-  mariadb:
-    image: wodby/mariadb:$MARIADB_TAG
-    container_name: "${PROJECT_NAME}_mariadb"
+  mysql:
+    image: mysql:$MYSQL_TAG
+    container_name: "${PROJECT_NAME}_mysql"
     stop_grace_period: 30s
     environment:
       MYSQL_ROOT_PASSWORD: $DB_ROOT_PASSWORD
@@ -16,8 +16,7 @@ services:
     container_name: "${PROJECT_NAME}_php"
     environment:
       SSMTP_MAILHUB: mailhog:1025
-      PHP_SENDMAIL_PATH: '"/usr/bin/dos2unix -u | /usr/sbin/ssmtp -t -f"'
-      GITLAB_TOKEN: $GITLAB_TOKEN
+      PHP_SENDMAIL_PATH: /usr/sbin/sendmail -t -i -S mailhog:1025
       ENVIRONMENT: $ENVIRONMENT
       DB_HOST: $DB_HOST
       DB_PORT: $DB_PORT
@@ -72,14 +71,6 @@ services:
       UPLOAD_LIMIT: 1G
     labels:
       - "traefik.http.routers.${PROJECT_NAME}_pma.rule=Host(`pma.${PROJECT_BASE_URL}`)"
-
-  node:
-    image: node:$NODE_TAG
-    container_name: "${PROJECT_NAME}_node"
-    working_dir: /var/www/html/front
-    tty: true
-    volumes:
-      - ./project:/var/www/html
 
   traefik:
     image: traefik:v2.0

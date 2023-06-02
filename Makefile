@@ -6,7 +6,6 @@ DRUPAL_CONTAINER=$(shell docker ps --filter name='^/$(PROJECT_NAME)_php' --forma
 COMPOSER_ROOT ?= /var/www/html
 DRUPAL_ROOT ?= /var/www/html/web
 DESKTOP_PATH ?= ~/Desktop/
-DRUPAL_VER ?= latest
 
 ## help : Print commands help.
 .PHONY: help
@@ -23,7 +22,7 @@ endif
 up:
 	mkdir -p project
 	@echo "Starting up containers for $(PROJECT_NAME)..."
-	docker-compose pull
+	docker compose pull
 	docker compose up -d --wait --remove-orphans --build
 
 ## down : Stop containers.
@@ -34,13 +33,13 @@ down: stop
 .PHONY: start
 start:
 	@echo "Starting containers for $(PROJECT_NAME) from where you left off..."
-	@docker-compose start
+	@docker compose start
 
 ## stop : Stop containers.
 .PHONY: stop
 stop:
 	@echo "Stopping containers for $(PROJECT_NAME)..."
-	@docker-compose stop
+	@docker compose stop
 
 ## prune : Remove containers and their volumes.
 ##		You can optionally pass an argument with the service name to prune single container
@@ -49,7 +48,7 @@ stop:
 .PHONY: prune
 prune:
 	@echo "Removing containers for $(PROJECT_NAME)..."
-	@docker-compose down -v $(filter-out $@,$(MAKECMDGOALS))
+	@docker compose down -v $(filter-out $@,$(MAKECMDGOALS))
 
 ## ps : List running containers.
 .PHONY: ps
@@ -82,7 +81,7 @@ drush:
 ##		logs nginx php : View `nginx` and `php` containers logs.
 .PHONY: logs
 logs:
-	@docker-compose logs -f $(filter-out $@,$(MAKECMDGOALS))
+	@docker compose logs -f $(filter-out $@,$(MAKECMDGOALS))
 
 ## create-init : Setup local project.
 ##		For example: make create-init "<project_name>"
@@ -97,6 +96,7 @@ create-init:
 create-setup:
 	cp -R ${DESKTOP_PATH}drupal-tma-pro-docker ${DESKTOP_PATH}$(word 2, $(MAKECMDGOALS))-docker
 	git clone $(word 3, $(MAKECMDGOALS)) ${DESKTOP_PATH}$(word 2, $(MAKECMDGOALS))-docker/project
+	ln -sr ${DESKTOP_PATH}$(word 2, $(MAKECMDGOALS))-docker/project/httpdocs ${DESKTOP_PATH}$(word 2, $(MAKECMDGOALS))-docker/project/web
 
 ## init : Create local project.
 ##		For example: make init "<project_name>"
@@ -104,104 +104,36 @@ create-setup:
 init:
 	$(MAKE) up
 	$(MAKE) create-project
-	$(MAKE) vendor
-	$(MAKE) drupal-init
-
-## setup : Create local project from existing Git project.
-.PHONY: setup
-setup:
-	$(MAKE) up
-	$(MAKE) gitlab-auth
-	$(MAKE) vendor
-	$(MAKE) copy-files
 	$(MAKE) drupal-install
-	$(MAKE) packages
-	$(MAKE) build
-
-## pull : Deploy on local.
-.PHONY: pull
-pull:
-	$(MAKE) drush-cex
-	$(MAKE) vendor
-	docker exec $(DRUPAL_CONTAINER) drush -r $(DRUPAL_ROOT) updatedb -y
-	docker exec $(DRUPAL_CONTAINER) drush -r $(DRUPAL_ROOT) config:import -y
-	docker exec $(DRUPAL_CONTAINER) drush -r $(DRUPAL_ROOT) locale:check
-	docker exec $(DRUPAL_CONTAINER) drush -r $(DRUPAL_ROOT) locale:update
-	docker exec $(DRUPAL_CONTAINER) drush -r $(DRUPAL_ROOT) cache:rebuild
 
 ## drush-cex : Export configurations.
 .PHONY: drush-cex
 drush-cex:
 	docker exec $(DRUPAL_CONTAINER) drush -r $(DRUPAL_ROOT) config:export -y --destination=./export
 
-## vendor : Composer install.
-.PHONY: vendor
-vendor:
-	docker exec $(DRUPAL_CONTAINER) composer --working-dir=$(COMPOSER_ROOT) install -o
-
 ## create-project : Create project from composer.
 .PHONY: create-project
 create-project:
-	docker exec $(DRUPAL_CONTAINER) rm -rf front
-ifeq ($(DRUPAL_VER),latest)
-	docker exec $(DRUPAL_CONTAINER) composer --working-dir=$(COMPOSER_ROOT) create-project drupal/recommended-project ./
-else
-	docker exec $(DRUPAL_CONTAINER) composer --working-dir=$(COMPOSER_ROOT) create-project drupal/recommended-project:${DRUPAL_VER} ./
-endif
 	docker exec $(DRUPAL_CONTAINER) mkdir front
+	docker exec $(DRUPAL_CONTAINER) wget https://ftp.drupal.org/files/projects/drupal-${DRUPAL_VER}.tar.gz
+	docker exec $(DRUPAL_CONTAINER) mkdir httpdocs
+	docker exec $(DRUPAL_CONTAINER) tar --strip-components=1 -xvzf drupal-${DRUPAL_VER}.tar.gz -C httpdocs
+	docker exec $(DRUPAL_CONTAINER) rm -rf drupal-${DRUPAL_VER}.tar.gz
+	ln -sr ${DESKTOP_PATH}$(word 2, $(MAKECMDGOALS))-docker/project/httpdocs ${DESKTOP_PATH}$(word 2, $(MAKECMDGOALS))-docker/project/web
 
 ## gitlab-auth : Composer create auth json.
 .PHONY: gitlab-auth
 gitlab-auth:
 	docker exec $(DRUPAL_CONTAINER) composer --working-dir=$(COMPOSER_ROOT) config --auth gitlab-token.gitlab.choosit.com ${GITLAB_TOKEN} --no-ansi --no-interaction
 
-## copy-files : Copy pre-commit, settings.php and .env files.
-.PHONY: copy-files
-copy-files:
-	$(MAKE) copy-pre-commit
-	$(MAKE) copy-settings-php
-	$(MAKE) copy-settings-local-php
-	cp .env ./project/.env
-
 ## copy-env-file : Copy .env file.
 .PHONY: copy-env-file
 copy-env-file:
 	cp .env.dist .env
 
-## copy-pre-commit : Copy pre-commit file.
-.PHONY: copy-pre-commit
-copy-pre-commit:
-	cp docker_utils/pre-commit ./project/.git/hooks/pre-commit
-
-## copy-settings-php : Copy settings.php file.
-.PHONY: copy-settings-php
-copy-settings-php:
-	cp docker_utils/default.settings.php ./project/web/sites/default/settings.php
-
-## copy-settings-local-php : Copy settings.local.php file.
-.PHONY: copy-settings-local-php
-copy-settings-local-php:
-	cp ./project/web/sites/example.settings.local.php ./project/web/sites/default/settings.local.php
-
-## drupal-install : Drupal site install from existent.
 .PHONY: drupal-install
 drupal-install:
-	docker exec $(DRUPAL_CONTAINER) drush -r $(DRUPAL_ROOT) si minimal -y --account-name=${INSTALL_ACCOUNT_NAME} --account-pass=${INSTALL_ACCOUNT_PASS} --account-mail=${INSTALL_ACCOUNT_MAIL} --existing-config
-
-## drupal-init : Drupal site install from scratch.
-.PHONY: drupal-init
-drupal-init:
-	docker exec $(DRUPAL_CONTAINER) drush -r $(DRUPAL_ROOT) si -y --db-url=${DB_DRIVER}://root:${DB_ROOT_PASSWORD}@${DB_HOST}/${DB_NAME} --account-name=${INSTALL_ACCOUNT_NAME} --account-pass=${INSTALL_ACCOUNT_PASS} --account-mail=${INSTALL_ACCOUNT_MAIL}
-
-## packages : npm install.
-.PHONY: packages
-packages:
-	docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_node' --format "{{ .ID }}") npm install
-
-## build : npm run build.
-.PHONY: build
-build:
-	docker exec -u "node" $(shell docker ps --filter name='^/$(PROJECT_NAME)_node' --format "{{ .ID }}") npm run build
+	docker exec $(shell docker ps --filter name='^/$(PROJECT_NAME)_php' --format "{{ .ID }}") drush -r $(DRUPAL_ROOT) site-install --db-url=${DB_DRIVER}://root:${DB_ROOT_PASSWORD}@${DB_HOST}/${DB_NAME} -y --account-name=${INSTALL_ACCOUNT_NAME} --account-pass=${INSTALL_ACCOUNT_PASS} --account-mail=${INSTALL_ACCOUNT_MAIL}
 
 ## restore-dump : Restore dump.
 ##		For example: make restore-dump ./dump/<dump_name>.sql.gz
