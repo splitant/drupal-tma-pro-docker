@@ -15,10 +15,9 @@ For Drupal 7.X versions.
 ### Installation
 
    ```sh
-   git checkout drupal-7
+   git clone --branch drupal-7 git@github.com:splitant/drupal-tma-pro-docker.git
+   cd drupal-tma-pro-docker
    make create-setup <project> <repo-git>
-   cd ../<project>-docker
-   make copy-env-file
    # Fill env file
    # optionally fill GITLAB_TOKEN in .env and `make gitlab-auth`
    make up
@@ -28,10 +27,9 @@ For Drupal 7.X versions.
 ### New project
 
    ```sh
-   git checkout drupal-7
+   git clone --branch drupal-7 git@github.com:splitant/drupal-tma-pro-docker.git
+   cd drupal-tma-pro-docker
    make create-init <project>
-   cd ../<project>-docker
-   make copy-env-file
    # Fill env file
    make init
    ```
@@ -43,10 +41,9 @@ For Drupal 8.X, 9.X versions.
 ### Installation
 
    ```sh
-   git checkout master
+   git clone --branch master git@github.com:splitant/drupal-tma-pro-docker.git
+   cd drupal-tma-pro-docker
    make create-setup <project> <repo-git>
-   cd ../<project>-docker
-   make copy-env-file
    # Fill env file
    # optionally fill GITLAB_TOKEN in .env and `make gitlab-auth`
    make setup
@@ -55,10 +52,9 @@ For Drupal 8.X, 9.X versions.
 ### New project
 
    ```sh
-   git checkout master
+   git clone --branch master git@github.com:splitant/drupal-tma-pro-docker.git
+   cd drupal-tma-pro-docker
    make create-init <project>
-   cd ../<project>-docker
-   make copy-env-file
    # Fill env file
    make init
    ```
